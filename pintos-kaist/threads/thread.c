@@ -27,6 +27,7 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+static struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -108,6 +109,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -208,6 +210,46 @@ thread_create (const char *name, int priority,
 	thread_unblock (t);
 
 	return tid;
+}
+
+bool cmp_tick(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+    struct thread *t1 = list_entry(a, struct thread, wait_elem);
+    struct thread *t2 = list_entry(b, struct thread, wait_elem);
+
+    return t1->wakeup_tick < t2->wakeup_tick;
+}
+
+void thread_sleep(int64_t wakeup_tick) {
+	struct thread *cur = thread_current();
+	if (cur == idle_thread) {return;}
+
+	// 임계 구역인 sleep_list를 수정해야 하므로 인터럽트 해제
+	enum intr_level old_level = intr_disable();
+
+	cur->wakeup_tick = wakeup_tick;
+	list_insert_ordered(&sleep_list, &cur->wait_elem, cmp_tick, NULL);
+
+	thread_block();
+
+	intr_set_level(old_level);
+}
+
+void thread_awake(int64_t now_tick) {
+	enum intr_level old_level = intr_disable();
+
+	struct list_elem *e = list_begin(&sleep_list);
+	while (e != list_end(&sleep_list)) {
+		struct thread *t = list_entry(e, struct thread, wait_elem);
+
+		if (t->wakeup_tick <= now_tick) {
+			e = list_remove(e);
+			thread_unblock(t);
+		} else {
+			break;
+		}
+	}
+
+	intr_set_level(old_level);
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled

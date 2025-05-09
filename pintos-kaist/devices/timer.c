@@ -87,14 +87,13 @@ timer_elapsed (int64_t then) {
 	return timer_ticks () - then;
 }
 
-/* Suspends execution for approximately TICKS timer ticks. */
+/* wakeup_tick, 즉 얼마나 잘 건지를 계산해 thread_sleep에게 넘기는 함수 */
 void
 timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks ();
+	if (ticks <= 0) return;
 
-	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	int64_t wakeup_tick = timer_ticks() + ticks;
+	thread_sleep(wakeup_tick);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -126,6 +125,7 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
+	thread_awake(ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
