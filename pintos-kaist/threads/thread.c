@@ -11,8 +11,11 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "devices/timer.h"
+
 #ifdef USERPROG
 #include "userprog/process.h"
+
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -39,6 +42,10 @@ static struct lock tid_lock;
 
 /* Thread destruction requests */
 static struct list destruction_req;
+
+// 슬립 리스트
+static struct list Sleep_list;
+
 
 /* Statistics. */
 static long long idle_ticks;    /* # of timer ticks spent idle. */
@@ -109,6 +116,7 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
+	list_init (&Sleep_list);
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -301,7 +309,10 @@ thread_yield (void) {
 
 	ASSERT (!intr_context ());
 
+	
+	//idle_thread : 빈 CPU에 배정해두는 더미 스레드
 	old_level = intr_disable ();
+	
 	if (curr != idle_thread)
 		list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
@@ -587,4 +598,51 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+
+void Sleep_list_in(struct list_elem *SL_elem, int64_t UBticks){
+	struct thread *st;
+	struct list_elem *cur = list_begin(&Sleep_list);
+
+	ASSERT (intr_get_level () == INTR_OFF);
+	
+	thread_current()->UB_ticks = UBticks;
+
+	while (cur != list_end(&Sleep_list)){
+		st = list_entry(cur, struct thread, SL_elem);
+		if(UBticks < st->UB_ticks){
+			break;
+		}
+		cur = list_next(cur);	
+	}
+	list_insert(cur, SL_elem);
+	return;
+	
+}
+
+void Sleep_list_out(void){
+
+	struct thread *st;
+	struct list_elem *cur = list_begin(&Sleep_list), *next;
+
+	
+	ASSERT (intr_get_level () == INTR_OFF);
+
+	while (cur != list_end(&Sleep_list)){
+
+		st = list_entry(cur, struct thread, SL_elem);
+
+        if (st->UB_ticks > ticks)
+            break;
+
+		next = list_next(cur);
+		list_remove(cur);
+		cur = next;
+
+		thread_unblock(st);		
+	}	
+	
+
+	return;
 }

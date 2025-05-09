@@ -94,6 +94,9 @@ struct thread {
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+	struct list_elem SL_elem;  
+	// struct list_elem SLelem;
+	int64_t UB_ticks;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -108,6 +111,17 @@ struct thread {
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
 };
+
+
+// typedef struct _sleep_list
+// {
+// 	int64_t UB_ticks;
+// 	struct list_elem elem;
+// 	struct list_elem SL_elem;
+// }Sleep_list;
+
+
+
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -143,4 +157,6 @@ int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
 
+void Sleep_list_in(struct list_elem *elem , int64_t UBtick);
+void Sleep_list_out(void);
 #endif /* threads/thread.h */

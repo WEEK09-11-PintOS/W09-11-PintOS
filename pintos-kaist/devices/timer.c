@@ -18,7 +18,10 @@
 #endif
 
 /* Number of timer ticks since OS booted. */
-static int64_t ticks;
+int64_t ticks;
+
+
+
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -90,11 +93,14 @@ timer_elapsed (int64_t then) {
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks ();
+	//몇번째 틱인지 저장
+	int64_t UB_ticks = timer_ticks() + ticks;
+	
 
-	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	enum intr_level old_level = intr_disable ();
+	Sleep_list_in(&(thread_current()->SL_elem), UB_ticks);
+	thread_block();
+	intr_set_level (old_level);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -125,7 +131,8 @@ timer_print_stats (void) {
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
-	thread_tick ();
+	thread_tick();
+	Sleep_list_out();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
