@@ -1,7 +1,7 @@
 #include "threads/thread.h"
-#include <debug.h>
+#include "lib/debug.h"
 #include <stddef.h>
-#include <random.h>
+#include "lib/random.h"
 #include <stdio.h>
 #include <string.h>
 #include "threads/flags.h"
@@ -27,6 +27,8 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+
+static struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -62,6 +64,7 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
+static bool compare_wakeup_tick(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -108,6 +111,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -152,6 +156,46 @@ thread_tick (void) {
 	/* Enforce preemption. */
 	if (++thread_ticks >= TIME_SLICE)
 		intr_yield_on_return ();
+}
+
+void thread_sleep(int64_t ticks) {
+	struct thread *curr;
+	enum intr_level old_level;
+	old_level = intr_disable();  // 인터럽트 비활성
+
+	curr = thread_current();	 // 현재 스레드
+	ASSERT(curr != idle_thread); // 현재 스레드가 idle이 아닐때만
+
+	curr->wakeup_tick = ticks;	 // 일어날 시각 저장
+
+	list_insert_ordered(&sleep_list, &curr->elem, cmp_thread_ticks, NULL);  // sleep_list에 추가
+	thread_block();	// 현재 스레드 재우기
+
+	intr_set_level(old_level);  // 인터럽트 상태를 원래 상태로 변경
+}
+
+void thread_wakeup(int64_t current_ticks) {
+	enum intr_level old_level;
+	old_level = intr_disable();
+
+	struct list_elem *curr_elem = list_begin(&sleep_list);
+	while (curr_elem != list_end(&sleep_list)) {
+		struct thread *curr_thread = list_entry(curr_elem, struct thread, elem);
+
+		if (current_ticks >= curr_thread->wakeup_tick) {
+			curr_elem = list_remove(curr_elem);
+			thread_unblock(curr_thread);
+		}
+		else break;
+	}
+	intr_set_level(old_level);
+}
+
+//  두 스레드의 wakeup_tick을 비교해서 작으면 true를 반환하는 함수
+bool cmp_thread_ticks (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+	struct thread *st_a = list_entry(a, struct thread, elem);
+	struct thread *st_b = list_entry(b, struct thread, elem);
+	return st_a->wakeup_tick < st_b->wakeup_tick;
 }
 
 /* Prints thread statistics. */
