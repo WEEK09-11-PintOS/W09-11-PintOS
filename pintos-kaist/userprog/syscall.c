@@ -68,25 +68,35 @@ void check_address(const void *addr) {
 	// TODO
 }
 
-static inline int get_user(const uint8_t *uaddr) {
-	// TODO
-}
-static inline bool put_user(uint8_t *udst, uint8_t byte) {
-	// TODO
-}
-
 void halt(void) {
 	// TODO
+	// 핀토스 종료 함수
 }
 
 void exit(int status) {
 	// TODO
+	// 현재 사용자 프로그램을 종료하고 반환하는 함수
 }
 
-pid_t exec(const char *cmd_line) {
+int exec(const char *cmd_line) {
 	// TODO
+	// 현재 프로세스를 이름이 cmd_line인 지정된 실행파일로 교체하는 함수
+	// cmd_line은 NULL이 아니어야 하며, 유효한 사용자 포인터여야 함
 }
 
 int wait(pid_t pid) {
 	// TODO
+	// 자식 프로세스를 기다림. 
+}
+
+pid_t fork (const char *thread_name) {
+	// TODO
+	// 현재 프로세스를 복제하여 새로운 프로세스를 생성하는 함수
+}
+
+int write(int fd, const void *buffer, unsigned size) {
+    // TODO: 유저 포인터 유효성 검사
+    // TODO: fd == 1인 경우 stdout 처리 (putbuf 사용)
+    // TODO: 그 외 fd는 현재 지원하지 않음
+    // TODO: 실패 시 -1 반환
 }

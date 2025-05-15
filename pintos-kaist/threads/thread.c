@@ -162,6 +162,12 @@ void thread_tick(void)
 	else
 		kernel_ticks++;
 
+		if (thread_mlfqs) {
+			mlfqs_on_tick ();
+		}
+    
+
+
 	/* Enforce preemption. */
 	if (++thread_ticks >= TIME_SLICE)
 		intr_yield_on_return();
@@ -747,9 +753,13 @@ static void update_recent_cpu(struct thread *t)
 		int_to_fixed(t->nice));
 }
 
+static void update_recent_cpu_cb(struct thread *t, void *aux UNUSED) {
+    update_recent_cpu(t);
+}
+
 static void update_all_recent_cpu(void)
 {
-	thread_foreach(update_recent_cpu, NULL);
+	thread_foreach(update_recent_cpu_cb, NULL);
 }
 
 static void update_priority(struct thread *t)
@@ -771,9 +781,13 @@ static void update_priority(struct thread *t)
 	t->priority = priority;
 }
 
+static void update_priority_cb(struct thread *t, void *aux UNUSED) {
+    update_priority(t);
+}
+
 static void update_all_priority(void)
 {
-	thread_foreach(update_priority, NULL);
+	thread_foreach(update_priority_cb, NULL);
 }
 
 void mlfqs_on_tick(void)

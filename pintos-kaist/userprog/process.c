@@ -28,7 +28,7 @@ static void __do_fork (void *);
 
 tid_t process_execute(const char *file_name); // 실행 요청
 static void start_process(void *f_name);      // 실행 시작
-bool load(const char *file_name, struct intr_frame *if_); // ELF 로드
+static bool load(const char *file_name, struct intr_frame *if_); // ELF 로드
 static void argument_stack(char **argv, int argc, struct intr_frame *if_);
 
 /* General process initializer for initd and other process. */
