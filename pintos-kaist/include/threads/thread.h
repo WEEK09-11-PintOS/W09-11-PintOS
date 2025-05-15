@@ -111,6 +111,23 @@ struct thread {
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 	struct list_elem allelem;
+
+	/* Process Hierarchy */
+    struct list children;              // 자식 프로세스 리스트
+    struct list_elem child_elem;      // 부모의 children 리스트에 들어갈 element
+    struct thread *parent;            // 부모 프로세스 포인터
+
+    /* Synchronization */
+    struct semaphore wait_sema;       // wait() 구현용 세마포어
+    struct semaphore fork_sema;       // exec 성공 여부 전달용
+    struct semaphore exit_sema;       // 부모에게 exit 전달용
+
+    /* Exit status */
+    int exit_status;
+
+    /* File descriptor */
+    struct file **fdt;                // File Descriptor Table
+    int next_fd;                      // 다음 할당할 fd 번호
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */

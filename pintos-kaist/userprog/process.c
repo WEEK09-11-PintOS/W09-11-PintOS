@@ -23,9 +23,13 @@
 #endif
 
 static void process_cleanup (void);
-static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
+
+tid_t process_execute(const char *file_name); // 실행 요청
+static void start_process(void *f_name);      // 실행 시작
+bool load(const char *file_name, struct intr_frame *if_); // ELF 로드
+static void argument_stack(char **argv, int argc, struct intr_frame *if_);
 
 /* General process initializer for initd and other process. */
 static void
@@ -569,6 +573,20 @@ install_page (void *upage, void *kpage, bool writable) {
 	return (pml4_get_page (t->pml4, upage) == NULL
 			&& pml4_set_page (t->pml4, upage, kpage, writable));
 }
+
+tid_t process_execute(const char *file_name) {
+	// TODO
+}
+
+static void start_process(void *f_name) {
+	// TODO
+}
+
+static void argument_stack(char **argv, int argc, struct intr_frame *if_) {
+	// TODO
+}
+
+
 #else
 /* From here, codes will be used after project 3.
  * If you want to implement the function for only project 2, implement it on the
