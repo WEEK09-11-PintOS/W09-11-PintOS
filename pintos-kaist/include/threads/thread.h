@@ -124,7 +124,6 @@ struct thread {
 
     /* Exit status */
     int exit_status;
-	bool has_exited_checker; //임준혁 파트에서 추가
 
     /* File descriptor */
     struct file **fdt;                // File Descriptor Table

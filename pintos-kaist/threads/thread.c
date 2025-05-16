@@ -517,7 +517,8 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->magic = THREAD_MAGIC;
 
 	//project2에서 추가
-	t->has_exited_checker = false;
+	sema_init(&t->exit_sema, 0);
+	sema_init(&t->wait_sema, 0);
 
 	// 도네이션 관련 초기화
 	list_init(&t->donation_list);
@@ -694,6 +695,17 @@ schedule(void)
 		if (curr && curr->status == THREAD_DYING && curr != initial_thread)
 		{
 			ASSERT(curr != next);
+			//자식의 부모 해제, sema_up 시도
+			struct thread *CH;
+			for(struct list_elem *child = list_begin(&curr->children);
+				child != list_end(&curr->children);
+				child = list_next(child)){
+
+					CH = list_entry(child,struct thread,child_elem);
+					CH->parent = NULL;
+					sema_up(&CH->exit_sema);
+
+			} 
 			list_remove(&curr->allelem);
 			list_push_back(&destruction_req, &curr->elem);
 		}
