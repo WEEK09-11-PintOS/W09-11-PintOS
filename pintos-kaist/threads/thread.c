@@ -264,6 +264,12 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+
+	enum intr_level old_level = intr_disable();
+	t->parent = thread_current();
+	list_push_back (&t->parent->children, &t->child_elem);
+	intr_set_level(old_level);
+	
 	/* Add to run queue. */
 	thread_unblock(t);
 	preempt_priority();
@@ -519,6 +525,18 @@ init_thread(struct thread *t, const char *name, int priority)
 	//project2에서 추가
 	sema_init(&t->exit_sema, 0);
 	sema_init(&t->wait_sema, 0);
+	sema_init(&t->fork_sema, 0);
+	list_init(&t->children);
+	t->exit_status = -1;
+
+	//fdt 테이블 초기화
+	// t->fdt = palloc_get_page(PAL_ZERO); 
+	// if(t->fdt == NULL)
+	// 	return TID_ERROR;
+	t->fdt = NULL;
+
+	//stdin / stdout 이 각각 0,1 차지
+	t->next_fd = 2;
 
 	// 도네이션 관련 초기화
 	list_init(&t->donation_list);
@@ -698,12 +716,13 @@ schedule(void)
 			//자식의 부모 해제, sema_up 시도
 			struct thread *CH;
 			for(struct list_elem *child = list_begin(&curr->children);
-				child != list_end(&curr->children);
-				child = list_next(child)){
+				child != list_end(&curr->children);){
 
-					CH = list_entry(child,struct thread,child_elem);
-					CH->parent = NULL;
-					sema_up(&CH->exit_sema);
+				CH = list_entry(child,struct thread,child_elem);
+				child = list_next(child);
+				CH->parent = NULL;
+				list_remove(&CH->child_elem);
+				sema_up(&CH->exit_sema);
 
 			} 
 			list_remove(&curr->allelem);
