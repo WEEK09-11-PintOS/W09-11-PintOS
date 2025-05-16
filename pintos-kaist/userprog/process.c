@@ -28,13 +28,15 @@ static void __do_fork (void *);
 
 tid_t process_execute(const char *file_name); // 실행 요청
 static void start_process(void *f_name);      // 실행 시작
-bool load(const char *file_name, struct intr_frame *if_); // ELF 로드
+static bool load(const char *file_name, struct intr_frame *if_); // ELF 로드
 static void argument_stack(char **argv, int argc, struct intr_frame *if_);
 
 /* General process initializer for initd and other process. */
 static void
 process_init (void) {
 	struct thread *current = thread_current ();
+
+	//작업 필요
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -55,6 +57,7 @@ process_create_initd (const char *file_name) {
 	strlcpy (fn_copy, file_name, PGSIZE);
 
 	/* Create a new thread to execute FILE_NAME. */
+	//initd 함수 시작으로 새 스레드 생성
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
@@ -203,24 +206,77 @@ process_exec (void *f_name) {
  *
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
+struct thread 
+*get_child_by_tid(tid_t child_tid){
+	struct thread *cur = thread_current();
+	struct thread *v = NULL;
+
+	enum intr_level old_level = intr_disable();
+	for(struct list_elem *i =list_begin(&cur->children); i != list_end(&cur->children); i = i->next){
+		struct thread *t = list_entry(i, struct thread, child_elem);
+		if(t->tid == child_tid){
+			v = t;
+			break;
+		}
+
+	}
+	intr_set_level(old_level);
+	return v;
+}
+
 int
 process_wait (tid_t child_tid UNUSED) {
-	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-	 * XXX:       to add infinite loop here before
-	 * XXX:       implementing the process_wait. */
-	return -1;
+	//for문으로 인자값 서치, 있으면 바로 child status 반환 없으면 블록
+	struct thread *cur = thread_current();
+	struct thread *search_cur = get_child_by_tid(child_tid);
+
+	if (search_cur == NULL)
+		return -1;
+
+
+	sema_down(&search_cur->wait_sema);
+	int stat = search_cur->exit_status;
+	list_remove(&search_cur->child_elem);
+
+	sema_up(&search_cur->exit_sema);
+
+	return stat;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
-	struct thread *curr = thread_current ();
-	/* TODO: Your code goes here.
-	 * TODO: Implement process termination message (see
-	 * TODO: project2/process_termination.html).
-	 * TODO: We recommend you to implement process resource cleanup here. */
+	struct thread *cur = thread_current ();
 
+	for(int i = 2; i<cur->next_fd; i++){
+		if (cur->fdt[i] != NULL)
+			file_close(cur->fdt[i]);
+		cur->fdt[i] = NULL;
+	}
+	
+	//실행 중ㅇ인 파일에 대한 별도 처리 필요 ex cur->runngin_file
+
+
+	palloc_free_page(cur->fdt);
+
+	//syscall의 exit에서 exit_status 설정이 선행되어야함
+	printf("exit: %s: %d\n", thread_name(), cur->exit_status);
+
+	
+	
+	if (cur->parent != NULL){
+		sema_up(&cur->wait_sema);
+	}
+
+	//이 사이에 부모가 삭제될 수도 있으니 분기 또한 구별
+	if (cur->parent != NULL){
+		sema_down(&cur->exit_sema);
+	}
+	//근데 부모 스레드가 wait을 안걸면 어떻게 되는거지...? down이 해제가 안되나..?
+	//전제 조건 1: wait / exit sema 둘다 0으로 기본 세팅 되어있어야함
+	//전제 조건 2: thread_exit 내부 로직에 자식 스레드 관련 부모 삭제와 sema up 처리가 추가되어야함
 	process_cleanup ();
+	thread_exit();
 }
 
 /* Free the current process's resources. */
