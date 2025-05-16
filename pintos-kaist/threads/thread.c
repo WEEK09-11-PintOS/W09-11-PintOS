@@ -143,6 +143,8 @@ void thread_start(void)
 	intr_enable();
 
 	/* Wait for the idle thread to initialize idle_thread. */
+	idle_thread->parent = NULL;
+	list_remove (&idle_thread->child_elem);
 	sema_down(&idle_started);
 }
 
@@ -267,7 +269,8 @@ tid_t thread_create(const char *name, int priority,
 
 	enum intr_level old_level = intr_disable();
 	t->parent = thread_current();
-	list_push_back (&t->parent->children, &t->child_elem);
+	if (thread_current() != NULL && thread_current()->parent != NULL)
+		list_push_back (&t->parent->children, &t->child_elem);
 	intr_set_level(old_level);
 	
 	/* Add to run queue. */
