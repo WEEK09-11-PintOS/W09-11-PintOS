@@ -516,6 +516,9 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 
+	//project2에서 추가
+	t->has_exited_checker = false;
+
 	// 도네이션 관련 초기화
 	list_init(&t->donation_list);
 	t->original_priority = priority;
