@@ -172,7 +172,7 @@ process_exec (void *f_name) {
 	int argc = 0;
 	char *token;
 
-	token = __strtok_r(f_name, " ", &save_ptr);
+	token = strtok_r(f_name, " ", &save_ptr);
 	char *file_name = token;
 
 	char *argv[LOADER_ARGS_LEN / 2 + 1];
@@ -180,7 +180,7 @@ process_exec (void *f_name) {
 	while (token != NULL) {
 		argv[argc] = token;
 		argc++;
-		token = __strtok_r(NULL, " ", &save_ptr);
+		token = strtok_r(NULL, " ", &save_ptr);
 	}
 	argv[argc] = NULL;
 
@@ -679,7 +679,7 @@ static void start_process(void *f_name) {
 		struct thread *curr = thread_current();
 		curr->exit_status = -1;
 		sema_up(&curr->fork_sema);
-		process_exit(-1);
+		process_exit();
 	}
 }
 
