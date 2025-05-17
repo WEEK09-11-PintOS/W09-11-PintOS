@@ -175,14 +175,13 @@ process_exec (void *f_name) {
 	token = strtok_r(f_name, " ", &save_ptr);
 	char *file_name = token;
 
-	char *argv[LOADER_ARGS_LEN / 2 + 1];
+	char *argv[128];
 
 	while (token != NULL) {
 		argv[argc] = token;
 		argc++;
 		token = strtok_r(NULL, " ", &save_ptr);
 	}
-	argv[argc] = NULL;
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -292,7 +291,6 @@ process_exit (void) {
 	//전제 조건 1: wait / exit sema 둘다 0으로 기본 세팅 되어있어야함
 	//전제 조건 2: thread_exit 내부 로직에 자식 스레드 관련 부모 삭제와 sema up 처리가 추가되어야함
 	process_cleanup ();
-	thread_exit();
 }
 
 /* Free the current process's resources. */
@@ -684,41 +682,40 @@ static void start_process(void *f_name) {
 }
 
 static void argument_stack(char **argv, int argc, struct intr_frame *if_) {
-
-	uint64_t rsp = if_->rsp;
+	char *argv_addr[128];
 
 	// 문자열 역순 복사 및 rsp push
-	for (int i = argc-1; i >= 0; i--) {
-		size_t len = strlen(argv[i]) + 1;
-		rsp -= len;
-		memcpy((void *)rsp, argv[i], len);
-		argv[i] = (char *) rsp;
-	}
+	for (int i = argc - 1; i >= 0; i--) {
+        size_t len = strlen(argv[i]) + 1;
+        if_->rsp -= len;
+        strlcpy(if_->rsp, argv[i], len);
+        argv_addr[i] = if_->rsp;  // 나중에 argv[i] 포인터로 다시 쓰기
+    }
 
 	// 16바이트(word) 정렬
-	size_t pad = (rsp & 0xF);
-	if (pad) {
-		rsp -= pad;
+	while (if_->rsp % 8 != 0) {
+
+		if_->rsp--;
+		*(uint8_t *)if_->rsp = 0;
 	}
 
-	// fake return address = 0
-	rsp -= 8;
-	*(uint64_t *) rsp = 0;
+	// NULL sentinel
+    if_->rsp -= 8;
+    *(uint64_t *)if_->rsp = 0;
 
-	// argv[argc] == NULL 포인터까지 포함하여 push
-	for (int i = argc; i >= 0; i--) {
-		rsp -= 8;
-		*(uint64_t *) rsp = (uint64_t) argv[i];
-	}
+    // argv[i] 포인터들 (역순 push)
+    for (int i = argc - 1; i >= 0; i--) {
+        if_->rsp -= 8;
+		*(uint64_t *)if_->rsp = (uint64_t)argv_addr[i];
+    }
 
-	// argc push
-	rsp -= 8;
-	*(uint64_t *) rsp = argc;
+	/* fake return address */
+	if_->rsp -= 8;
+	*(uint64_t *)if_->rsp = 0;
 
 	// intr_frame 갱신
-	if_->rsp = rsp;
 	if_->R.rdi = argc;
-	if_->R.rsi = rsp + 8;
+	if_->R.rsi = if_->rsp + 8;
 }
 
 
