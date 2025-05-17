@@ -35,8 +35,6 @@ static void argument_stack(char **argv, int argc, struct intr_frame *if_);
 static void
 process_init (void) {
 	struct thread *current = thread_current ();
-
-	//작업 필요
 }
 
 /* Starts the first userland program, called "initd", loaded from FILE_NAME.
@@ -169,8 +167,22 @@ error:
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
-	char *file_name = f_name;
 	bool success;
+	char *save_ptr;
+	int argc = 0;
+	char *token;
+
+	token = __strtok_r(f_name, " ", &save_ptr);
+	char *file_name = token;
+
+	char *argv[LOADER_ARGS_LEN / 2 + 1];
+
+	while (token != NULL) {
+		argv[argc] = token;
+		argc++;
+		token = __strtok_r(NULL, " ", &save_ptr);
+	}
+	argv[argc] = NULL;
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -185,11 +197,15 @@ process_exec (void *f_name) {
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
+	palloc_free_page (f_name);
 
 	/* If load failed, quit. */
-	palloc_free_page (file_name);
 	if (!success)
 		return -1;
+
+	sema_up(&thread_current()->fork_sema);
+
+	argument_stack(argv, argc, &_if);
 
 	/* Start switched process. */
 	do_iret (&_if);
@@ -631,15 +647,78 @@ install_page (void *upage, void *kpage, bool writable) {
 }
 
 tid_t process_execute(const char *file_name) {
-	// TODO
+	char *fn_copy;
+	tid_t child_tid;
+
+	fn_copy = palloc_get_page(0);
+	if (fn_copy == NULL) {
+		return TID_ERROR;
+	}
+
+	strlcpy (fn_copy, file_name, PGSIZE);
+
+	child_tid = thread_create(file_name, PRI_DEFAULT, start_process, fn_copy);
+	if (child_tid == TID_ERROR) {
+		palloc_free_page(fn_copy);	// 부모가 직접 회수
+		return TID_ERROR;
+	}
+	struct thread *child = get_child_by_tid(child_tid);
+	ASSERT (child != NULL);	// 리스트에서 찾지 못하면 버그
+
+	sema_down(&child->fork_sema);	// load 완료 대기
+
+	if (child->exit_status == -1) {
+		return TID_ERROR;	// 자식이 fn_copy를 이미 회수
+	}
+	return child_tid;
 }
 
 static void start_process(void *f_name) {
-	// TODO
+	if (process_exec(f_name) == -1) {
+		// 실패한 경우에만 여기 도달
+		struct thread *curr = thread_current();
+		curr->exit_status = -1;
+		sema_up(&curr->fork_sema);
+		process_exit(-1);
+	}
 }
 
 static void argument_stack(char **argv, int argc, struct intr_frame *if_) {
-	// TODO
+
+	uint64_t rsp = if_->rsp;
+
+	// 문자열 역순 복사 및 rsp push
+	for (int i = argc-1; i >= 0; i--) {
+		size_t len = strlen(argv[i]) + 1;
+		rsp -= len;
+		memcpy((void *)rsp, argv[i], len);
+		argv[i] = (char *) rsp;
+	}
+
+	// 16바이트(word) 정렬
+	size_t pad = (rsp & 0xF);
+	if (pad) {
+		rsp -= pad;
+	}
+
+	// fake return address = 0
+	rsp -= 8;
+	*(uint64_t *) rsp = 0;
+
+	// argv[argc] == NULL 포인터까지 포함하여 push
+	for (int i = argc; i >= 0; i--) {
+		rsp -= 8;
+		*(uint64_t *) rsp = (uint64_t) argv[i];
+	}
+
+	// argc push
+	rsp -= 8;
+	*(uint64_t *) rsp = argc;
+
+	// intr_frame 갱신
+	if_->rsp = rsp;
+	if_->R.rdi = argc;
+	if_->R.rsi = rsp + 8;
 }
 
 
