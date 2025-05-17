@@ -4,7 +4,8 @@
 /* System call numbers. */
 enum {
 	/* Projects 2 and later. */
-	SYS_HALT,                   /* Halt the operating system. */
+	                   /* Halt the operating system. */
+    SYS_HALT,
 	SYS_EXIT,                   /* Terminate this process. */
 	SYS_FORK,                   /* Clone current process. */
 	SYS_EXEC,                   /* Switch current process. */
