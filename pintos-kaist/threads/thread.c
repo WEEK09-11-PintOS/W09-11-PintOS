@@ -143,8 +143,6 @@ void thread_start(void)
 	intr_enable();
 
 	/* Wait for the idle thread to initialize idle_thread. */
-	idle_thread->parent = NULL;
-	list_remove (&idle_thread->child_elem);
 	sema_down(&idle_started);
 }
 
